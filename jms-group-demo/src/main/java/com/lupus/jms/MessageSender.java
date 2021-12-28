@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021. Michael Wolff
+ */
+
 package com.lupus.jms;
 
 import org.apache.commons.logging.Log;
@@ -7,7 +11,9 @@ import javax.jms.*;
 
 
 /**
+ * A JMS message sender.
  *
+ * Each instance of JMS message sender has/requires a broker URL and a Queue nanem.
  */
 public class MessageSender extends JMSClient {
     private static Log LOGGER = LogFactory.getLog(MessageSender.class);
@@ -15,8 +21,11 @@ public class MessageSender extends JMSClient {
     private final String queueName;
 
     /**
-     *
+     * Creates a {@link MessageSender} with specified broker and target queue.
      * @param brokerURL
+     *      The borker URL
+     * @param  queueName
+     *      Name of the JMS-Queue to which this sender should deliver it's messages.
      */
     public MessageSender(String brokerURL, String queueName) {
         super(brokerURL);
@@ -24,10 +33,14 @@ public class MessageSender extends JMSClient {
     }
 
     /**
+     * Sends a JMS {@link TextMessage Message}.
      *
      * @param text
+     *      Text to be sent.
      * @param msgGroup
+     *      Optional message group (for partitioning)
      * @param seqNo
+     *      A sequence number, which allows to check if ordering is as expected/required.
      * @throws JMSException
      */
     public void sendMessage(String text, String msgGroup, int seqNo) throws JMSException {
