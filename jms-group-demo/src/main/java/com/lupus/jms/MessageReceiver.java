@@ -11,6 +11,11 @@ import java.util.Enumeration;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+/**
+ * Implements a {@link Runnable} which reads JMS messages from specified {@link Queue}.
+ * <b>Note:</b> This implementation is <b>not</b> threadsafe, so each {@link Thread} has to be use
+ * its own private instance.
+ */
 public class MessageReceiver extends JMSClient implements  Runnable {
     private static final Log LOGGER = LogFactory.getLog(MessageReceiver.class);
     private final String queueName;
@@ -19,9 +24,24 @@ public class MessageReceiver extends JMSClient implements  Runnable {
     private Session session = null;
     private Destination destination = null;
     private MessageConsumer consumer = null;
-    private MessageProducer producer = null;
     private final Consumer<Message> messageHandler;
 
+    /**
+     * Creates a {@link MessageReceiver} for specified broker and queue.
+     * <p>
+     *     In general this receiver will read JMS messages from the specified queue in an endless loop with a
+     *     timeout of 10s. If timeout is reached and #exitOnTimeout is set to true, the run method will finish.
+     * </p>
+     * @param brokerURL
+     *      The broker URL
+     * @param queueName
+     *      Name of the JMS queue
+     * @param exitOnTimeout
+     *      If true, run will exit if a timeout happened.
+     * @param msgConsumer
+     *      {@link Consumer} which accepts received JMS {@link Message Messages}
+     * @throws JMSException
+     */
     public MessageReceiver(String brokerURL, String queueName, boolean exitOnTimeout, Consumer<Message> msgConsumer) throws JMSException {
         super(brokerURL);
 
@@ -62,8 +82,8 @@ public class MessageReceiver extends JMSClient implements  Runnable {
                     LOGGER.fatal("Receiving or handling message failed.", e);
                     session.rollback();
                 } finally {
-                    if (cnt++ % 10 == 0) {
-                        consumer = recreateConsumer(consumer);
+                    if (cnt++ % 10 == 0) { // Rebalance every 10th message
+                        recreateConsumer();
                     }
                 }
             }
@@ -77,18 +97,14 @@ public class MessageReceiver extends JMSClient implements  Runnable {
         }
     }
 
-    private MessageConsumer recreateConsumer(MessageConsumer oldConsumer) throws JMSException {
-        oldConsumer.close();
-        return session.createConsumer(destination);
-    }
-
-    private void closeMessageGroup(String messageGroup) throws JMSException {
-        LOGGER.info(String.format("[%s] - Closing group: %s" ,Thread.currentThread().getName() ,messageGroup));
-        TextMessage msg = session.createTextMessage("Closing group: " + messageGroup);
-        msg.setStringProperty(JMSXGROUP_ID_PROP, messageGroup);
-        msg.setIntProperty(JMSXGROUP_SEQ_PROP, -1);
-
-        producer.send(msg);
+    /**
+     * Recreates the {@link MessageConsumer} attached to this instance of a {@link MessageReceiver}.
+     *
+     * @throws JMSException
+     */
+    private void recreateConsumer() throws JMSException {
+        consumer.close();                               // Triggers rebalancing
+        consumer = session.createConsumer(destination); // of message groups
     }
 
     /**
@@ -100,7 +116,6 @@ public class MessageReceiver extends JMSClient implements  Runnable {
         session = connection.createSession(true, Session.SESSION_TRANSACTED);
         destination = session.createQueue(queueName);
         consumer = session.createConsumer(destination);
-        producer = session.createProducer(destination);
     }
 
     /**
