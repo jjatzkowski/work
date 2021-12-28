@@ -128,10 +128,6 @@ public class MessageReceiver extends JMSClient implements  Runnable {
             consumer.close();
         } catch (Exception e) {
         }
-        if (producer != null) try {
-            producer.close();
-        } catch (Exception e) {
-        }
         if (session != null) try {
             session.close();
         } catch (Exception e) {
